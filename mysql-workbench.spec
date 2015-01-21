@@ -25,13 +25,13 @@
 
 # Directory where iodbc and pyodbc binaries are located. Build both using the build_iodbc.sh script
 # If using distribution provided ODBC manager lib and pyodbc, then comment out this
-%define odbc_home        $HOME/linux-res-6.2/usr
-%define linuxres_home    $HOME/linux-res-6.2
+#%#define odbc_home        $HOME/linux-res-6.2/usr
+#%#define linuxres_home    $HOME/linux-res-6.2
 
 %define vsqlite_dir      $HOME/linux-res-6.2/vsqlite
 %define ctemplate_dir    $HOME/linux-res-6.2
 
-%define gdal_dir         $HOME/linux-res-6.2/gdal
+#%#define gdal_dir         $HOME/linux-res-6.2/gdal
 
 %if "%{edition}" == "commercial"
 %define commercial       1
@@ -43,8 +43,8 @@
 %define license_file     LICENSE.mysql
 %else
 %define community        1
-%define mysqlcppconn_dir $HOME/linux-res-6.2/cppconn-gpl
-%define mysql_home       $HOME/mysql-server
+#%#define mysqlcppconn_dir $HOME/linux-res-6.2/cppconn-gpl
+#%#define mysql_home       $HOME/mysql-server
 
 %define edition          community
 %define license_type     GPLv2
@@ -60,9 +60,19 @@ Vendor : Oracle Corporation
 License: %{license_type}
 URL    : http://wb.mysql.com
 Source : %{name}-%{version}-src.tar.gz
+Source1 : antlr-3.4-complete.jar
 
 BuildRoot    : %{_tmppath}/%{name}-%{version}-root
 BuildRequires: pcre-devel >= 3.9
+%if 0%{?fedora} >= 21
+BuildRequires: mariadb-devel
+BuildRequires: ant
+BuildRequires: autoconf
+BuildRequires: automake
+BuildRequires: libtool
+BuildRequires: libiodbc-devel
+BuildRequires: gdal-devel
+%endif
 %if 0%{?fedora} >= 20
 
 %endif
@@ -115,6 +125,8 @@ Conflicts: mysql-workbench-commercial
 
 
 # Filtering: https://fedoraproject.org/wiki/Packaging:AutoProvidesAndRequiresFiltering
+%global __requires_exclude ^lib(antlr3c_wb)\\.so.*$
+%if 0
 %if 0%{?fedora}
 %if 0%{?commercial}
 %global __requires_exclude ^lib(antlr3c_wb|cdbc|grt|linux_utilities|mdcanvasgtk|mdcanvas|mforms|mysqlparser|sqlparser|sqlide|wbbase|wbpublic|wbprivate|wbscintilla|mysqlcppconn|iodbc|iodbcadm|iodbcinst|mysqlclient|gdal|sqlite3)\\.so.*$
@@ -125,7 +137,8 @@ Conflicts: mysql-workbench-commercial
 %global __requires_exclude %{__requires_exclude}|db.*)\\.so.*$
 %global __requires_exclude %{__requires_exclude}|wb.*)\\.so.*$
 %endif
-%global __provides_exclude_from ^(%{_libdir}/mysql.workbench/.*\\.so.*|%{_libdir}/mysql/libmysqlclient\\.so.*|%{mysqlcppconn_dir}/lib/libmysqlcppconn\\.so.*|%{odbc_home}/lib/libiodbc\\.so.*)$
+%global __provides_exclude_from ^(%{_libdir}/mysql.workbench/.*\\.so.*|%{_libdir}/mysql/libmysqlclient\\.so.*|%{mysqlcppconn_dir}/%{_lib}/libmysqlcppconn\\.so.*|%{odbc_home}/%{_lib}/libiodbc\\.so.*)$
+%endif
 %endif
 
 %if 0%{?rhel}
@@ -180,19 +193,30 @@ Windows, Linux and Mac OS X.
 
 
 %prep
+mkdir -p linux-res/bin/
+cp %{SOURCE1} linux-res/bin/
 
 # Add the -D flag if you don't want to delete the source root on each build
 %setup -q -n %{name}-%{version}-src
+sed -ie 's/ReloadIfChanged/ReloadAllIfChanged/g' backend/wbpublic/sqlide/recordset_text_storage.cpp
 
 
 %build
 %cmake -DCMAKE_BUILD_TYPE=Release \
        -DREAL_EXECUTABLE_DIR=%{_libexecdir}/mysql-workbench \
+%if %{defined mysql_home}
        -DMYSQL_CONFIG_PATH=%{mysql_home}/bin/mysql_config \
+%endif
+%if %{defined mysqlcppconn_dir}
        -DMYSQLCPPCONN_LIBRARY="-L%{mysqlcppconn_dir}/lib -lmysqlcppconn" \
        -DMYSQLCPPCONN_INCLUDE_DIR=%{mysqlcppconn_dir}/include \
+%endif
+%if %{defined odbc_home}
        -DIODBC_CONFIG_PATH=%{odbc_home}/bin/iodbc-config \
+%endif
+%if %{defined gdal_dir}
        -DGDAL_INCLUDE_DIR=%{gdal_dir}/include -DGDAL_LIBRARY=%{gdal_dir}/lib/libgdal.so \
+%endif
 %if 0%{?rhel} == 6
        -DVSQLITE_INCLUDE_DIR=%{vsqlite_dir}/include \
        -DVSQLITE_LIBRARIES="-L%{vsqlite_dir}/lib -lvsqlitepp" \
@@ -210,8 +234,8 @@ rm -fr %{buildroot}/usr/share/doc/mysql-workbench
     cp -a %{mysqlcppconn_dir}/lib/libmysqlcppconn.so.7* %{buildroot}%{_libdir}/mysql-workbench
 %endif
 
-if [ -f %{vsqlite_dir}/lib/libvsqlitepp.so.3 ]; then
-    cp -a %{vsqlite_dir}/lib/libvsqlitepp.so.3* %{buildroot}%{_libdir}/mysql-workbench
+if [ -f %{vsqlite_dir}/%{_lib}/libvsqlitepp.so.3 ]; then
+    cp -a %{vsqlite_dir}%{_lib}lib/libvsqlitepp.so.3* %{buildroot}%{_libdir}/mysql-workbench
 fi
 
 # Bundle client programs and lib
@@ -231,7 +255,7 @@ fi
 
 
 %if 0%{?fedora} 
-  cp -a /usr/lib64/libctemplate.so* %{buildroot}%{_libdir}/mysql-workbench
+  cp -a /usr/%{_lib}/libctemplate.so* %{buildroot}%{_libdir}/mysql-workbench
 %else
 %if 0%{?rhel} < 7
     cp -a %{ctemplate_dir}/lib/libctemplate.so* %{buildroot}%{_libdir}/mysql-workbench
@@ -254,16 +278,18 @@ find %{buildroot}%{_libdir}/mysql-workbench -name \*.la -exec rm {} \; -print
   cp -a %{odbc_home}/bin/iodbcadm-gtk %{buildroot}%{_libexecdir}/mysql-workbench/
 %endif
 
-if [ %{linuxres_home} ]; then
+%if %{defined linuxres_home}
   cp -a %{linuxres_home}/pyodbc.so %{buildroot}%{_libdir}/mysql-workbench/modules
 %if 0%{?commercial}
   # Bundle libs only needed in commercial edition
   cp -a %{linuxres_home}/sqlite3/libsqlite3.so %{buildroot}%{_libdir}/mysql-workbench/
   cp -a %{linuxres_home}/pysqlite2 %{buildroot}%{_libdir}/mysql-workbench/modules
 %endif
-fi
+%endif
 
+%if %{defined gdal_dir}
 cp -a %{gdal_dir}/lib/libgdal.so.* %{buildroot}%{_libdir}/mysql-workbench/
+%endif
 
 %post
 touch --no-create %{_datadir}/icons/hicolor || :
@@ -310,9 +336,13 @@ rm -rf %{_builddir}/%{name}-%{version}-src
 %dir %{_libexecdir}/mysql-workbench
 %attr(0755,root,root) %{_libexecdir}/mysql-workbench/mysql-workbench-bin
 %attr(0755,root,root) %{_libexecdir}/mysql-workbench/wbcopytables-bin
+%if %{defined odbc_home}
 %attr(0755,root,root) %{_libexecdir}/mysql-workbench/iodbcadm-gtk
+%endif
+%if %{defined mysql_home}
 %attr(0755,root,root) %{_libexecdir}/mysql-workbench/mysql
 %attr(0755,root,root) %{_libexecdir}/mysql-workbench/mysqldump
+%endif
 
 %{_libdir}/mysql-workbench
 

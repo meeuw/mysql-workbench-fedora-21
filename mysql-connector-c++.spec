@@ -1,6 +1,6 @@
 Summary:    MySQL database connector for C++
 Name:       mysql-connector-c++
-Version:    1.1.2
+Version:    1.1.5
 Release:    1%{?dist}
 Group:      System Environment/Libraries
 License:    GPLv2 with exceptions
@@ -46,6 +46,8 @@ These are the files needed to compile programs using MySQL Connector/C++.
 %prep
 %setup -q
 
+sed -i -e 's/MYSQL_VERSION_ID >= 50703/0/' driver/nativeapi/libmysql_static_proxy.cpp
+
 # Workaround for http://bugs.mysql.com/bug.php?id=68320
 sed -i -e 's/lib$/%{_lib}/' driver/CMakeLists.txt
 chmod -x examples/*.cpp examples/*.txt
@@ -88,7 +90,7 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %doc ANNOUNCEMEN* COPYING README CHANGES Licenses_for_Third-Party_Components.txt
-%{_libdir}/libmysqlcppconn.so.6*
+%{_libdir}/libmysqlcppconn.so.7*
 %exclude %{_libdir}/libmysqlcppconn-static.a
 %exclude %{_prefix}/ANNOUNCEMENT
 %exclude %{_prefix}/COPYING
